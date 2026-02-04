@@ -33,7 +33,7 @@ function handleReceiptType(msg, totals) {
     if (foodResult && foodResult.valid) {
       totals.food_costs += foodResult.price;
       totals.foodCount += 1;
-      Logger.log('Food Total: ' + foodResult.priceLine);
+      Logger.log('==Food Receipt== : Food Total: ' + foodResult.priceLine + ' - extracted_price ' + foodResult.price.toFixed(2));
     } else {
       Logger.log('No food TOTAL line found');
       Logger.log('Plain Body: ' + plainBody);
@@ -44,8 +44,9 @@ function handleReceiptType(msg, totals) {
     if (tipResult && tipResult.valid) {
       totals.tip_costs += tipResult.price;
       totals.tipCount += 1;
-      Logger.log('Total');
-      Logger.log(tipResult.priceLine);
+      Logger.log('==Tip Receipt== : Total');
+      Logger.log('==Tip Receipt== : ' + tipResult.priceLine);
+      Logger.log('==Tip Receipt== : extracted_tip ' + tipResult.price.toFixed(2));
     } else {
       Logger.log('No tip Total found');
       Logger.log('Plain Body: ' + plainBody);
