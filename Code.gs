@@ -4,15 +4,15 @@ function printGrabEmails() {
   var endDate = '2026/01/31';    // 31 Jan 23:59:59 Manila
   var query = 'from:no-reply@grab.com after:' + startDate + ' before:' + endDate;
   
-  var totals = { food_costs: 0.0, foodCount: 0, tip_costs: 0.0, tipCount: 0, taxi_costs: 0.0, taxiCount: 0 };
+  var totals = { food_costs: 0.0, foodCount: 0, tip_costs: 0.0, tipCount: 0, taxi_costs: 0.0, taxiCount: 0, mart_costs: 0.0, martCount: 0 };
   
   var threads = GmailApp.search(query, 0, 500);
   var messages = GmailApp.getMessagesForThreads(threads);
   for (var i = 0; i < messages.length; i++) {
     for (var j = 0; j < messages[i].length; j++) {
       var msg = messages[i][j];
-      Logger.log('Subject: ' + msg.getSubject());
-      Logger.log('From: ' + msg.getFrom());
+      // Logger.log('Subject: ' + msg.getSubject());
+      // Logger.log('From: ' + msg.getFrom());
       Logger.log('Date: ' + msg.getDate());
       
       handleReceiptType(msg, totals);
@@ -23,8 +23,8 @@ function printGrabEmails() {
   Logger.log('Food: ' + totals.foodCount + ' orders, PHP ' + totals.food_costs.toFixed(2));
   Logger.log('Tips: ' + totals.tipCount + ', PHP ' + totals.tip_costs.toFixed(2));
   Logger.log('Taxi: ' + totals.taxiCount + ' rides, PHP ' + totals.taxi_costs.toFixed(2));
+  Logger.log('Mart: ' + totals.martCount + ' orders, PHP ' + totals.mart_costs.toFixed(2));
 }
-
 
 function handleReceiptType(msg, totals) {
   var plainBody = msg.getPlainBody();
@@ -66,12 +66,24 @@ function handleReceiptType(msg, totals) {
       Logger.log('No tip Total found');
       Logger.log('Plain Body: ' + plainBody);
     }
+  } else if (plainBody.indexOf('Thanks for shopping with us!') !== -1) {
+    // Mart order
+    var martResult = parseMartReceipt(plainBody);
+    if (martResult && martResult.valid) {
+      totals.mart_costs += martResult.price;
+      totals.martCount += 1;
+      Logger.log('==Mart Receipt== : Total');
+      Logger.log('==Mart Receipt== : P ' + martResult.price.toFixed(2));
+      Logger.log('==Mart Receipt== : mart_price ' + martResult.price.toFixed(2));
+    } else {
+      Logger.log('No mart Total found');
+      Logger.log('Plain Body: ' + plainBody);
+    }
   } else {
     // Default: other receipts - full body
     Logger.log('Plain Body: ' + plainBody);
   }
 }
-
 
 function parseFoodReceipt(body) {
   var totalMatch = body.match(/TOTAL \(INCL\. TAX\)\s+(₱\s+\d+(?:\.\d{2})?)/i);
@@ -85,7 +97,6 @@ function parseFoodReceipt(body) {
   }
   return null;
 }
-
 
 function parseTipReceipt(body) {
   var lines = body.split('\n');
@@ -102,7 +113,6 @@ function parseTipReceipt(body) {
   return null;
 }
 
-
 function parseTaxiReceipt(body) {
   var lines = body.split('\n');
   for (var i = 0; i < lines.length - 1; i++) {
@@ -113,6 +123,19 @@ function parseTaxiReceipt(body) {
       if (!isNaN(priceNum)) {
         return { valid: true, price: priceNum, priceLine: priceLine };
       }
+    }
+  }
+  return null;
+}
+
+function parseMartReceipt(body) {
+  var totalMatch = body.match(/Total \(Including tax\)\s+(₱\s+\d+(?:\.\d{2})?)/i);
+  if (totalMatch) {
+    var priceLine = totalMatch[1];
+    var priceStr = priceLine.replace(/[^0-9.]/g, '');
+    var priceNum = parseFloat(priceStr);
+    if (!isNaN(priceNum)) {
+      return { valid: true, price: priceNum, priceLine: priceLine };
     }
   }
   return null;
