@@ -4,7 +4,7 @@ function printGrabEmails() {
   var endDate = '2026/01/31';    // 31 Jan 23:59:59 Manila
   var query = 'from:no-reply@grab.com after:' + startDate + ' before:' + endDate;
   
-  var totals = { food_costs: 0.0, foodCount: 0, tip_costs: 0.0, tipCount: 0, taxi_costs: 0.0, taxiCount: 0, mart_costs: 0.0, martCount: 0 };
+  var totals = { foodCosts: 0.0, foodCount: 0, tipCosts: 0.0, tipCount: 0, taxiCosts: 0.0, taxiCount: 0, martCosts: 0.0, martCount: 0 };
   
   var threads = GmailApp.search(query, 0, 500);
   var messages = GmailApp.getMessagesForThreads(threads);
@@ -20,10 +20,10 @@ function printGrabEmails() {
       Logger.log('---');
     }
   }
-  Logger.log('Food: ' + totals.foodCount + ' orders, PHP ' + totals.food_costs.toFixed(2));
-  Logger.log('Tips: ' + totals.tipCount + ', PHP ' + totals.tip_costs.toFixed(2));
-  Logger.log('Taxi: ' + totals.taxiCount + ' rides, PHP ' + totals.taxi_costs.toFixed(2));
-  Logger.log('Mart: ' + totals.martCount + ' orders, PHP ' + totals.mart_costs.toFixed(2));
+  Logger.log('Food: ' + totals.foodCount + ' orders, PHP ' + totals.foodCosts.toFixed(2));
+  Logger.log('Tips: ' + totals.tipCount + ', PHP ' + totals.tipCosts.toFixed(2));
+  Logger.log('Taxi: ' + totals.taxiCount + ' rides, PHP ' + totals.taxiCosts.toFixed(2));
+  Logger.log('Mart: ' + totals.martCount + ' orders, PHP ' + totals.martCosts.toFixed(2));
 }
 
 function handleReceiptType(msg, totals) {
@@ -33,7 +33,7 @@ function handleReceiptType(msg, totals) {
     // Food order
     var foodResult = parseFoodReceipt(plainBody);
     if (foodResult && foodResult.valid) {
-      totals.food_costs += foodResult.price;
+      totals.foodCosts += foodResult.price;
       totals.foodCount += 1;
       Logger.log('==Food Receipt== : Food Total: ' + foodResult.priceLine + ' - extracted_price ' + foodResult.price.toFixed(2));
     } else {
@@ -44,7 +44,7 @@ function handleReceiptType(msg, totals) {
     // Taxi order
     var taxiResult = parseTaxiReceipt(plainBody);
     if (taxiResult && taxiResult.valid) {
-      totals.taxi_costs += taxiResult.price;
+      totals.taxiCosts += taxiResult.price;
       totals.taxiCount += 1;
       Logger.log('==Taxi Receipt== : Total');
       Logger.log('==Taxi Receipt== : ' + taxiResult.priceLine);
@@ -57,7 +57,7 @@ function handleReceiptType(msg, totals) {
     // Tip receipt
     var tipResult = parseTipReceipt(plainBody);
     if (tipResult && tipResult.valid) {
-      totals.tip_costs += tipResult.price;
+      totals.tipCosts += tipResult.price;
       totals.tipCount += 1;
       Logger.log('==Tip Receipt== : Total');
       Logger.log('==Tip Receipt== : ' + tipResult.priceLine);
@@ -70,7 +70,7 @@ function handleReceiptType(msg, totals) {
     // Mart order
     var martResult = parseMartReceipt(plainBody);
     if (martResult && martResult.valid) {
-      totals.mart_costs += martResult.price;
+      totals.martCosts += martResult.price;
       totals.martCount += 1;
       Logger.log('==Mart Receipt== : Total');
       Logger.log('==Mart Receipt== : P ' + martResult.price.toFixed(2));
