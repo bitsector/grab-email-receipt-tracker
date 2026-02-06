@@ -4,7 +4,7 @@ function printGrabEmails() {
   var endDate = '2026/01/31';    // 31 Jan 23:59:59 Manila
   var query = 'from:no-reply@grab.com after:' + startDate + ' before:' + endDate;
   
-  var totals = { food_costs: 0.0, foodCount: 0, tip_costs: 0.0, tipCount: 0 };
+  var totals = { food_costs: 0.0, foodCount: 0, tip_costs: 0.0, tipCount: 0, taxi_costs: 0.0, taxiCount: 0 };
   
   var threads = GmailApp.search(query, 0, 500);
   var messages = GmailApp.getMessagesForThreads(threads);
@@ -22,7 +22,9 @@ function printGrabEmails() {
   }
   Logger.log('Food: ' + totals.foodCount + ' orders, PHP ' + totals.food_costs.toFixed(2));
   Logger.log('Tips: ' + totals.tipCount + ', PHP ' + totals.tip_costs.toFixed(2));
+  Logger.log('Taxi: ' + totals.taxiCount + ' rides, PHP ' + totals.taxi_costs.toFixed(2));
 }
+
 
 function handleReceiptType(msg, totals) {
   var plainBody = msg.getPlainBody();
@@ -36,6 +38,19 @@ function handleReceiptType(msg, totals) {
       Logger.log('==Food Receipt== : Food Total: ' + foodResult.priceLine + ' - extracted_price ' + foodResult.price.toFixed(2));
     } else {
       Logger.log('No food TOTAL line found');
+      Logger.log('Plain Body: ' + plainBody);
+    }
+  } else if (plainBody.indexOf('Hope you enjoyed your ride!') !== -1) {
+    // Taxi order
+    var taxiResult = parseTaxiReceipt(plainBody);
+    if (taxiResult && taxiResult.valid) {
+      totals.taxi_costs += taxiResult.price;
+      totals.taxiCount += 1;
+      Logger.log('==Taxi Receipt== : Total');
+      Logger.log('==Taxi Receipt== : ' + taxiResult.priceLine);
+      Logger.log('==Taxi Receipt== : extracted_taxi_cost ' + taxiResult.price.toFixed(2));
+    } else {
+      Logger.log('No taxi Total found');
       Logger.log('Plain Body: ' + plainBody);
     }
   } else if (plainBody.indexOf('Thanks! Your tip goes a long way for your driver.') !== -1) {
@@ -57,6 +72,7 @@ function handleReceiptType(msg, totals) {
   }
 }
 
+
 function parseFoodReceipt(body) {
   var totalMatch = body.match(/TOTAL \(INCL\. TAX\)\s+(₱\s+\d+(?:\.\d{2})?)/i);
   if (totalMatch) {
@@ -70,10 +86,27 @@ function parseFoodReceipt(body) {
   return null;
 }
 
+
 function parseTipReceipt(body) {
   var lines = body.split('\n');
   for (var i = 0; i < lines.length - 1; i++) {
     if (lines[i].trim() === 'Total') {
+      var priceLine = lines[i + 1].trim();
+      var priceStr = priceLine.replace(/[^0-9.]/g, '');
+      var priceNum = parseFloat(priceStr);
+      if (!isNaN(priceNum)) {
+        return { valid: true, price: priceNum, priceLine: priceLine };
+      }
+    }
+  }
+  return null;
+}
+
+
+function parseTaxiReceipt(body) {
+  var lines = body.split('\n');
+  for (var i = 0; i < lines.length - 1; i++) {
+    if (lines[i].trim() === 'Total Paid') {
       var priceLine = lines[i + 1].trim();
       var priceStr = priceLine.replace(/[^0-9.]/g, '');
       var priceNum = parseFloat(priceStr);
