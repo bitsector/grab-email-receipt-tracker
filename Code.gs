@@ -134,6 +134,7 @@ function parseMartReceipt(body) {
     var priceLine = totalMatch[1];
     var priceStr = priceLine.replace(/[^0-9.]/g, '');
     var priceNum = parseFloat(priceStr);
+    analyzeMartReceiptContent(body)
     if (!isNaN(priceNum)) {
       return { valid: true, price: priceNum, priceLine: priceLine };
     }
