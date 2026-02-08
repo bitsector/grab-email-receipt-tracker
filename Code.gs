@@ -1,89 +1,71 @@
-function printGrabEmails() {
-  // Edit these dates (YYYY/MM/DD format, Manila time assumed)
-  var startDate = '2026/01/15';  // 15 Jan 00:00 Manila
-  var endDate = '2026/01/31';    // 31 Jan 23:59:59 Manila
-  var query = 'from:no-reply@grab.com after:' + startDate + ' before:' + endDate;
+// Config
+const CONFIG = {
+  START_DATE: '2026/01/15',
+  END_DATE: '2026/01/31',
+  QUERY_BASE: 'from:no-reply@grab.com after:${start} before:${end}',
+  MAX_THREADS: 500
+};
+
+const CATEGORY_PARSERS = {
+  food: { keyword: 'Hope you enjoyed your food!', parser: parseFoodReceipt },
+  taxi: { keyword: 'Hope you enjoyed your ride!', parser: parseTaxiReceipt },
+  tip: { keyword: 'Thanks! Your tip goes a long way for your driver.', parser: parseTipReceipt },
+  mart: { keyword: 'Thanks for shopping with us!', parser: parseMartReceipt }
+};
+
+function analizeGrabEmails() {
+  const totals = { foodCosts: 0, foodCount: 0, tipCosts: 0, tipCount: 0, taxiCosts: 0, taxiCount: 0, martCosts: 0, martCount: 0 };
   
-  var totals = { foodCosts: 0.0, foodCount: 0, tipCosts: 0.0, tipCount: 0, taxiCosts: 0.0, taxiCount: 0, martCosts: 0.0, martCount: 0 };
+  const query = CONFIG.QUERY_BASE.replace('${start}', CONFIG.START_DATE).replace('${end}', CONFIG.END_DATE);
+  const threads = GmailApp.search(query, 0, CONFIG.MAX_THREADS);
+  const messages = GmailApp.getMessagesForThreads(threads);
   
-  var threads = GmailApp.search(query, 0, 500);
-  var messages = GmailApp.getMessagesForThreads(threads);
-  for (var i = 0; i < messages.length; i++) {
-    for (var j = 0; j < messages[i].length; j++) {
-      var msg = messages[i][j];
-      // Logger.log('Subject: ' + msg.getSubject());
-      // Logger.log('From: ' + msg.getFrom());
-      Logger.log('Date: ' + msg.getDate());
-      
-      handleReceiptType(msg, totals);
-      
-      Logger.log('---');
-    }
-  }
-  Logger.log('Food: ' + totals.foodCount + ' orders, PHP ' + totals.foodCosts.toFixed(2));
-  Logger.log('Tips: ' + totals.tipCount + ', PHP ' + totals.tipCosts.toFixed(2));
-  Logger.log('Taxi: ' + totals.taxiCount + ' rides, PHP ' + totals.taxiCosts.toFixed(2));
-  Logger.log('Mart: ' + totals.martCount + ' orders, PHP ' + totals.martCosts.toFixed(2));
+  messages.flat().forEach(msg => processMessage(msg, totals));
+  
+  logSummary(totals);
 }
 
-function handleReceiptType(msg, totals) {
-  var plainBody = msg.getPlainBody();
+function processMessage(msg, totals) {
+  const body = msg.getPlainBody();
+  const category = findCategory(body);
   
-  if (plainBody.indexOf('Hope you enjoyed your food!') !== -1) {
-    // Food order
-    var foodResult = parseFoodReceipt(plainBody);
-    if (foodResult && foodResult.valid) {
-      totals.foodCosts += foodResult.price;
-      totals.foodCount += 1;
-      Logger.log('==Food Receipt== : Food Total: ' + foodResult.priceLine + ' - extracted_price ' + foodResult.price.toFixed(2));
-    } else {
-      Logger.log('No food TOTAL line found');
-      Logger.log('Plain Body: ' + plainBody);
+  if (!category) {
+    Logger.log(`Unknown: ${msg.getSubject()}`);
+    return;
+  }
+  
+  try {
+    const result = category.parser(body);
+    if (result?.valid) {
+      totals[`${category.key}Costs`] += result.price;
+      totals[`${category.key}Count`]++;
+      logReceipt(category.key, result);
     }
-  } else if (plainBody.indexOf('Hope you enjoyed your ride!') !== -1) {
-    // Taxi order
-    var taxiResult = parseTaxiReceipt(plainBody);
-    if (taxiResult && taxiResult.valid) {
-      totals.taxiCosts += taxiResult.price;
-      totals.taxiCount += 1;
-      Logger.log('==Taxi Receipt== : Total');
-      Logger.log('==Taxi Receipt== : ' + taxiResult.priceLine);
-      Logger.log('==Taxi Receipt== : extracted_taxi_cost ' + taxiResult.price.toFixed(2));
-    } else {
-      Logger.log('No taxi Total found');
-      Logger.log('Plain Body: ' + plainBody);
-    }
-  } else if (plainBody.indexOf('Thanks! Your tip goes a long way for your driver.') !== -1) {
-    // Tip receipt
-    var tipResult = parseTipReceipt(plainBody);
-    if (tipResult && tipResult.valid) {
-      totals.tipCosts += tipResult.price;
-      totals.tipCount += 1;
-      Logger.log('==Tip Receipt== : Total');
-      Logger.log('==Tip Receipt== : ' + tipResult.priceLine);
-      Logger.log('==Tip Receipt== : extracted_tip ' + tipResult.price.toFixed(2));
-    } else {
-      Logger.log('No tip Total found');
-      Logger.log('Plain Body: ' + plainBody);
-    }
-  } else if (plainBody.indexOf('Thanks for shopping with us!') !== -1) {
-    // Mart order
-    var martResult = parseMartReceipt(plainBody);
-    if (martResult && martResult.valid) {
-      totals.martCosts += martResult.price;
-      totals.martCount += 1;
-      Logger.log('==Mart Receipt== : Total');
-      Logger.log('==Mart Receipt== : P ' + martResult.price.toFixed(2));
-      Logger.log('==Mart Receipt== : mart_price ' + martResult.price.toFixed(2));
-    } else {
-      Logger.log('No mart Total found');
-      Logger.log('Plain Body: ' + plainBody);
-    }
-  } else {
-    // Default: other receipts - full body
-    Logger.log('Plain Body: ' + plainBody);
+  } catch (e) {
+    Logger.log(`Parse error ${category.key}: ${e}`);
   }
 }
+
+function findCategory(body) {
+  for (const [key, { keyword, parser }] of Object.entries(CATEGORY_PARSERS)) {
+    if (body.includes(keyword)) return { key, parser };
+  }
+  return null;
+}
+
+function logReceipt(type, result) {
+  Logger.log(`==${type.toUpperCase()}== ${result.priceLine} → PHP ${result.price.toFixed(2)}`);
+}
+
+function logSummary(totals) {
+  Object.entries(totals).forEach(([key, value]) => {
+    if (key.endsWith('Count') && value > 0) {
+      const cat = key.replace('Count', '');
+      Logger.log(`${cat}: ${value} , PHP ${totals[`${cat}Costs`].toFixed(2)}`);
+    }
+  });
+}
+
 
 function parseFoodReceipt(body) {
   var totalMatch = body.match(/TOTAL \(INCL\. TAX\)\s+(₱\s+\d+(?:\.\d{2})?)/i);
